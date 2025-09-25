@@ -25,6 +25,7 @@ from time import perf_counter
 THIS FUNCTION IS NOT YET IMPLEMENTED
 """
 from constants.xml_constants import XmlConstants
+from constants.prompts import Prompts
 from services.aws.lambda_event_helper import LambdaEventHelper
 from services.application.messages.mepcom_nlp_processing_messages import MEPCOMNLPProcessingMessages
 from utils.xml_parser import XmlParserUtil
@@ -35,6 +36,8 @@ logging_container = LoggingContainer()
 from container import Container
 if TYPE_CHECKING:
     from services.aws.s3_service import S3Service
+
+
 
 system_prompt = (
     """
@@ -340,7 +343,7 @@ def lambda_handler(event, context):
             reporter = container.reporting_repository()
             s3_iterator = container.s3_file_iterator_service()
             s3_service = container.s3_service()
-            testChat = s3_service.bedrock_chat(system_prompt, sample_medical_note)
+            testChat = s3_service.bedrock_chat(Prompts.DODI, sample_medical_note)
             bucket_name = container.config.pdf_s3_bucket()
             s3Xml = s3_service.get_object_text(bucket_name, "usmepcom/hie-documents/1666701215/0165c859-0a5e-43c2-96f0-ee956d385314.xml")
             temp2 = determine_s3_file_type(s3_service, bucket_name, "usmepcom/hie-documents/1666701219/00e71de1-bbbd-4dbe-bc10-991adedbd6cc.pdf")
