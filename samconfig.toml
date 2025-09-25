@@ -1,0 +1,12 @@
+version = 0.1
+[default.deploy.parameters]
+stack_name = "usmepcom-mirs-nlp-project-dev"
+resolve_s3 = true
+s3_prefix = "usmepcom-mirs-nlp-project-dev"
+region = "us-gov-west-1"
+capabilities = "CAPABILITY_NAMED_IAM"
+parameter_overrides = "Environment=\"dev\" Version=\"1.0.0.0 Build 2\" ResultsBucket=\"dataoperations-digin-dev/mepcom/awprdhae-s3-pdc-results-stg\" ConfigBucket=\"dataoperations-digin-dev/mepcom/awprdhae-s3-pdc-config-stg\""
+image_repositories = []
+confirm_changeset = true
+disable_rollback = true
+tags = "Solution=MEPCOM"

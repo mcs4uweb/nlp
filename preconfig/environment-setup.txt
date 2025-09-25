@@ -1,0 +1,47 @@
+# AWS Access keys
+# Request IAM access keys from your security administrator, these will be used later
+
+# Virtual Environment
+## create the virtual envirnment
+python -m venv .venv
+
+## activate the virtual environment
+.venv\Scripts\Activate
+
+## (optional) update the script execution policy if need be
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Unrestricted -Force
+
+## ensure the (.venv) is decorating your command line
+### example:
+#  (.venv) PS C:\source\repos\APITests> 
+
+## install dependencies to environment
+pip install -r requirements.txt
+
+
+# AWS SAM CLI
+## How to install AWS SAM CLI
+https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html
+
+Download the AWS SAM CLI 64-bit:
+https://github.com/aws/aws-sam-cli/releases/latest/download/AWS_SAM_CLI_64_PY3.msi
+
+Verify the installation:
+sam --version
+
+# Setup AWS Credentials
+In Windows, go to the folder: C:\Users\matth\.aws
+- update your 'config' file's profile with the appropriate AWS region
+-- example: region = us-gov-west-1
+- update your 'credentials' file's profile with the appropriate keys
+-- example: aws_access_key_id = XXXAQ6WL99AYX5OE2XXX
+-- example: aws_secret_access_key = XXXxw8TwEyQeK4Ckjhwe93NCvAP35re96eI95PgXXX
+
+
+
+# Environment Errors
+
+if this error occurs when trying to use pip:
+    "Fatal error in launcher: Unable to create process using"
+you can try reinstalling pip using:
+    python -m pip install --upgrade --force-reinstall pip

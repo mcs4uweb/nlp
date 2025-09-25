@@ -1,0 +1,353 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  usmepcom-mirs-nlp-processor-project
+
+  PDC NLP Pipeline – core sync resources (Lambdas + child Step Function)
+
+Globals:
+
+  Function:
+    Runtime: python3.11
+    Timeout: 300 # default timeout
+    MemorySize: 1536  # default memory size
+    Tracing: Active
+    AutoPublishAlias: live
+    Description: !Sub "${Version}"
+    Tags: # default tags
+      Environment: !Ref Environment
+      Project: USMEPCOM-MIRS-NLP-PROCESSOR
+      Solution: MEPCOM
+    Environment: # default environment variables
+      Variables:
+        AWS_REGION_NAME: "us-gov-west-1"
+        ENVIRONMENT: !Ref Environment
+        DB_CONNECTION_SECRET_NAME: !Sub "awprmips/mepcom_mssql_credentials_${Environment}"
+        AWS_LOG_GROUP: !Sub "/aws/lambda/awprmips-loggroup-mepcom-nlp-processor-${Environment}"
+        ACM_ENDPOINT_URL: comprehendmedical-fips.us-gov-west-1.amazonaws.com
+        RESULTS_BUCKET: !Ref ResultsBucket
+        CONFIG_BUCKET: !Ref ConfigBucket
+    LoggingConfig:
+      LogGroup: !Sub "/aws/lambda/awprmips-loggroup-mepcom-nlp-processor-${Environment}"
+      LogFormat: JSON  # This enables structured logging
+      SystemLogLevel: INFO
+      ApplicationLogLevel: FATAL
+
+Parameters:
+
+  # (example) sam deploy --parameter-overrides Environment=environment-name
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - test
+      - stg
+      - prod
+
+  Version: 
+    Type: String
+    Default: "1.0.0.0 Build 1"
+    Description: "Semantic version for lambda function"
+
+  ResultsBucket:
+    Type: String
+    Default: "dataoperations-digin-dev/usmepcom/awprdhae-s3-pdc-results-dev"
+
+  ConfigBucket:
+    Type: String
+    Default: "dataoperations-digin-dev/usmepcom/awprdhae-s3-pdc-config-dev"
+
+Resources:
+
+  # Log Group Definitions
+  MEPCOMNLPProcessorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/awprmips-loggroup-mepcom-nlp-processor-${Environment}"
+      RetentionInDays: 365
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: "Solution"
+          Value: "MEPCOM"
+
+  # Lambda Definitions
+  MEPCOMSqlGetJobStateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub awprmips-lambda-mepcom-sql-get-job-state-${Environment}
+      CodeUri: src/lambdas/
+      Handler: mepcom_sql_get_job_state.lambda_handler
+      Role: !Sub "arn:aws-us-gov:iam::${AWS::AccountId}:role/nlp-processing-pdc-function-role-${Environment}"
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0d74c46a811fb926f
+        SubnetIds:
+          - subnet-0f21dc2128d256846
+      Layers:
+        - !ImportValue 
+          Fn::Sub: MEPCOMDependencyInjectorLayerArn-${Environment}
+        - !ImportValue 
+          Fn::Sub: MEPCOMCombinedLayerArn-${Environment}
+        - !ImportValue 
+          Fn::Sub: MEPCOMPyMSSqlLayerArn-${Environment}
+      Architectures:
+        - x86_64
+
+  MEPCOMNoteHarvestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub awprmips-lambda-mepcom-note-harvest-${Environment}
+      CodeUri: src/lambdas/
+      Handler: mepcom_note_harvest.lambda_handler
+      Role: !Sub "arn:aws-us-gov:iam::${AWS::AccountId}:role/nlp-processing-pdc-function-role-${Environment}"
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0d74c46a811fb926f
+        SubnetIds:
+          - subnet-0f21dc2128d256846
+      Layers:
+        - !ImportValue 
+          Fn::Sub: MEPCOMDependencyInjectorLayerArn-${Environment}
+        - !ImportValue 
+          Fn::Sub: MEPCOMCombinedLayerArn-${Environment}
+        - !ImportValue 
+          Fn::Sub: MEPCOMPyMSSqlLayerArn-${Environment}
+      Architectures:
+        - x86_64
+
+  MEPCOMAcmInvokeSyncFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub awprmips-lambda-mepcom-acm-invoke-sync-${Environment}
+      CodeUri: src/lambdas/
+      Handler: mepcom_acm_invoke_sync.lambda_handler
+      ReservedConcurrentExecutions: 40
+      Role: !Sub "arn:aws-us-gov:iam::${AWS::AccountId}:role/nlp-processing-pdc-function-role-${Environment}"
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0d74c46a811fb926f
+        SubnetIds:
+          - subnet-0f21dc2128d256846
+      Layers:
+        - !ImportValue 
+          Fn::Sub: MEPCOMDependencyInjectorLayerArn-${Environment}
+        - !ImportValue 
+          Fn::Sub: MEPCOMCombinedLayerArn-${Environment}
+        - !ImportValue 
+          Fn::Sub: MEPCOMPyMSSqlLayerArn-${Environment}
+      Architectures:
+        - x86_64
+
+  MEPCOMPostprocessCountsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub awprmips-lambda-mepcom-post-process-counts-${Environment}
+      CodeUri: src/lambdas/
+      Handler: mepcom_postprocess_counts.lambda_handler
+      Role: !Sub "arn:aws-us-gov:iam::${AWS::AccountId}:role/nlp-processing-pdc-function-role-${Environment}"
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0d74c46a811fb926f
+        SubnetIds:
+          - subnet-0f21dc2128d256846
+      Layers:
+        - !ImportValue 
+          Fn::Sub: MEPCOMDependencyInjectorLayerArn-${Environment}
+        - !ImportValue 
+          Fn::Sub: MEPCOMCombinedLayerArn-${Environment}
+        - !ImportValue 
+          Fn::Sub: MEPCOMPyMSSqlLayerArn-${Environment}
+      Architectures:
+        - x86_64
+
+  MEPCOMSqlSetJobStateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub awprmips-lambda-mepcom-sql-set-job-state-${Environment}
+      CodeUri: src/lambdas/
+      Handler: mepcom_sql_set_job_state.lambda_handler
+      Role: !Sub "arn:aws-us-gov:iam::${AWS::AccountId}:role/nlp-processing-pdc-function-role-${Environment}"
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0d74c46a811fb926f
+        SubnetIds:
+          - subnet-0f21dc2128d256846
+      Layers:
+        - !ImportValue 
+          Fn::Sub: MEPCOMDependencyInjectorLayerArn-${Environment}
+        - !ImportValue 
+          Fn::Sub: MEPCOMCombinedLayerArn-${Environment}
+        - !ImportValue 
+          Fn::Sub: MEPCOMPyMSSqlLayerArn-${Environment}
+      Architectures:
+        - x86_64
+
+  # Step Function Definitions
+  MEPCOMNLPProcessingStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: !Sub "awprmips-stepfunvtion-mepcom-nlp-processing-${Environment}"
+      RoleArn: !Sub "arn:aws-us-gov:iam::${AWS::AccountId}:role/nlp-processing-stepfunction-role-${Environment}"
+      DefinitionString:
+        !Sub |
+          {
+            "Comment": "NLP Processor Step Function",
+            "StartAt": "Get Job State (SQL)",
+            "States": {
+              "Get Job State (SQL)": {
+                "Type": "Task",
+                "Resource": "arn:aws-us-gov:states:::lambda:invoke",
+                "Output": "{% $states.result.Payload %}",
+                "Arguments": {
+                  "FunctionName": "arn:aws-us-gov:lambda:us-gov-west-1:064852123697:function:awprmips-lambda-mepcom-sql-get-job-state-dev:$LATEST",
+                  "Payload": "{% $states.input %}"
+                },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "Lambda.ServiceException",
+                      "Lambda.AWSLambdaException",
+                      "Lambda.SdkClientException",
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2,
+                    "JitterStrategy": "FULL"
+                  }
+                ],
+                "Next": "Note Harvest"
+              },
+              "Note Harvest": {
+                "Type": "Task",
+                "Resource": "arn:aws-us-gov:states:::lambda:invoke",
+                "Output": "{% $states.result.Payload %}",
+                "Arguments": {
+                  "FunctionName": "arn:aws-us-gov:lambda:us-gov-west-1:064852123697:function:awprmips-lambda-mepcom-note-harvest-dev:$LATEST",
+                  "Payload": "{% $states.input %}"
+                },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "Lambda.ServiceException",
+                      "Lambda.AWSLambdaException",
+                      "Lambda.SdkClientException",
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2,
+                    "JitterStrategy": "FULL"
+                  }
+                ],
+                "Next": "ACM Invoke Sync"
+              },
+              "ACM Invoke Sync": {
+                "Type": "Task",
+                "Resource": "arn:aws-us-gov:states:::lambda:invoke",
+                "Output": "{% $states.result.Payload %}",
+                "Arguments": {
+                  "FunctionName": "arn:aws-us-gov:lambda:us-gov-west-1:064852123697:function:awprmips-lambda-mepcom-acm-invoke-sync-dev:$LATEST",
+                  "Payload": "{% $states.input %}"
+                },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "Lambda.ServiceException",
+                      "Lambda.AWSLambdaException",
+                      "Lambda.SdkClientException",
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2,
+                    "JitterStrategy": "FULL"
+                  }
+                ],
+                "Next": "Post Process PDC Counts"
+              },
+              "Post Process PDC Counts": {
+                "Type": "Task",
+                "Resource": "arn:aws-us-gov:states:::lambda:invoke",
+                "Output": "{% $states.result.Payload %}",
+                "Arguments": {
+                  "FunctionName": "arn:aws-us-gov:lambda:us-gov-west-1:064852123697:function:awprmips-lambda-mepcom-post-process-counts-dev:$LATEST",
+                  "Payload": "{% $states.input %}"
+                },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "Lambda.ServiceException",
+                      "Lambda.AWSLambdaException",
+                      "Lambda.SdkClientException",
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2,
+                    "JitterStrategy": "FULL"
+                  }
+                ],
+                "Next": "Set Job State (SQL)"
+              },
+              "Set Job State (SQL)": {
+                "Type": "Task",
+                "Resource": "arn:aws-us-gov:states:::lambda:invoke",
+                "Output": "{% $states.result.Payload %}",
+                "Arguments": {
+                  "FunctionName": "arn:aws-us-gov:lambda:us-gov-west-1:064852123697:function:awprmips-lambda-mepcom-sql-set-job-state-dev:$LATEST",
+                  "Payload": "{% $states.input %}"
+                },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "Lambda.ServiceException",
+                      "Lambda.AWSLambdaException",
+                      "Lambda.SdkClientException",
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2,
+                    "JitterStrategy": "FULL"
+                  }
+                ],
+                "End": true
+              }
+            },
+            "QueryLanguage": "JSONata"
+          }
+
+
+Outputs:
+
+  LogGroup:
+    Description: 'Log group for the Lambda functions'
+    Value: !Ref MEPCOMNLPProcessorLogGroup
+
+  MEPCOMNLPProcessingStateMachineArn:
+    Description: "ARN of the NLP Processing State Machine"
+    Value: !GetAtt MEPCOMNLPProcessingStateMachine.Arn
+
+  MEPCOMSqlGetJobStateFunctionArn:
+    Description: "ARN of the SQL Get Job State Lambda Function"
+    Value: !GetAtt MEPCOMSqlGetJobStateFunction.Arn
+
+  MEPCOMNoteHarvestFunctionArn:
+    Description: "ARN of the Note Harvest Lambda Function"
+    Value: !GetAtt MEPCOMNoteHarvestFunction.Arn
+
+  MEPCOMAcmInvokeSyncFunctionArn:
+    Description: "ARN of the ACM Invoke Sync Lambda Function"
+    Value: !GetAtt MEPCOMAcmInvokeSyncFunction.Arn
+
+  MEPCOMPostprocessCountsFunctionArn:
+    Description: "ARN of the Postprocess Counts Lambda Function"
+    Value: !GetAtt MEPCOMPostprocessCountsFunction.Arn
+
+  MEPCOMSqlSetJobStateFunctionArn:
+    Description: "ARN of the SQL Set Job State Lambda Function"
+    Value: !GetAtt MEPCOMSqlSetJobStateFunction.Arn
+
