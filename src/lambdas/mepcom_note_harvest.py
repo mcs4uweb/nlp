@@ -26,6 +26,7 @@ THIS FUNCTION IS NOT YET IMPLEMENTED
 """
 from constants.xml_constants import XmlConstants
 from constants.prompts import Prompts
+from constants.appConfig import AppConfig
 from services.aws.lambda_event_helper import LambdaEventHelper
 from services.application.messages.mepcom_nlp_processing_messages import MEPCOMNLPProcessingMessages
 from utils.xml_parser import XmlParserUtil
@@ -262,8 +263,8 @@ def lambda_handler(event, context):
     assessment_plan_text = test.get("clinical_notes", {}).get("assessment_and_plan")
     encounters = test.get("clinical_notes", {}).get("encounters")
     cda_parser = CDAParserUtil(raw_cda_xml)
-    
-    persons_table="[MEPCOM_DEV].[mirs].[Person]"  
+    t = AppConfig.mirsPerson
+    persons_table = f"[MEPCOM_DEV].[mirs].[{AppConfig.mirsPerson}]"
     
     try:
 
